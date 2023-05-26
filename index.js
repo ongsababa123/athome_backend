@@ -21,7 +21,7 @@ app.use(bodyParser.json());
 const connection = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: '',
+  password: '1234',
   database: 'athome'
 });
 
@@ -276,7 +276,6 @@ app.post('/bill/user', async (req, res) => {
 
 app.post('/bill/chart/user', async (req, res) => {
   const { id } = req.body;
-
   try {
     const query = 'SELECT * FROM bill WHERE id_user = ?';
     const results = await new Promise((resolve, reject) => {
@@ -288,7 +287,6 @@ app.post('/bill/chart/user', async (req, res) => {
         }
       });
     });
-
     const groupedData = {};
     for (let i = 0; i < results.length; i++) {
       const data = results[i];
@@ -300,8 +298,29 @@ app.post('/bill/chart/user', async (req, res) => {
       }
       groupedData[weekNumber].push(data);
     }
-
-    res.json(groupedData);
+    const datacalculate = {};
+    Object.keys(groupedData).forEach((key) => {
+      let date = new Date(groupedData[key][0].date);
+      const mondayOfWeek = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay() + 1);
+      const sundayOfWeek = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay() + 7);
+      const mondayDate = formatDate(mondayOfWeek);
+      const sundayDate = formatDate(sundayOfWeek);
+      const dateformat = mondayDate + " - " + sundayDate;
+      let datacal = 0;
+      groupedData[key].forEach((data) => {
+        datacal += data.total_cash + data.total_transfer;
+        if (!datacalculate[key]) {
+          datacalculate[key] = [];
+        }
+      });
+      if (!datacalculate[key]) {
+        datacalculate[key] = [];
+      }
+      datacalculate[key].push(datacal);
+      datacalculate[key].push(dateformat);
+    });
+    
+    res.json(datacalculate);
   } catch (error) {
     res.status(500).send('An error occurred');
   }
@@ -310,10 +329,13 @@ app.post('/bill/chart/user', async (req, res) => {
     const millisecsInDay = 86400000;
     return Math.ceil(((date - onejan) / millisecsInDay + onejan.getDay() - 1) / 7);
   }
+  function formatDate(date) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
 });
-
-
-
 
 app.post('/bill/user/update', async (req, res) => {
   const { id_bill, worktime, cash, transfer_amount, transfer_amount_user, expenses, note, imagesNew, imagesDelete } = req.body;
