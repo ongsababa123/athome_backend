@@ -21,7 +21,7 @@ app.use(bodyParser.json());
 const connection = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: '1234',
+  password: '',
   database: 'athome'
 });
 
@@ -56,14 +56,14 @@ app.post('/login', async (req, res) => {
 
     if (userResults.length > 0) {
       const id = userResults[0].id_user;
-      const token = jwt.sign({ id }, secret, { expiresIn: '12h' });
+      const token = jwt.sign({ id: id , profile: "user" }, secret, { expiresIn: '12h' });
       return res.json({ status: "ok", token });
     }
 
     const adminResults = await query('SELECT * FROM admin WHERE name = ? AND password = ?', [user, password]);
     if (adminResults.length > 0) {
       const id = adminResults[0].id_admin;
-      const token = jwt.sign({ id }, secret, { expiresIn: '12h' });
+      const token = jwt.sign({ id: id , profile: "admin" }, secret, { expiresIn: '12h' });
       return res.json({ status: "admin", token });
     }
 
@@ -125,12 +125,14 @@ app.post("/add_employee", jsonParser, function (req, res, next) {
       res.json({ status: "error", message: "ชื่อผู้ใช้ซ้ำกัน" });
     } else {
       connection.query(
-        "INSERT INTO user (username, name_user, lastname_user, password_user) VALUES (?, ?, ?, ?)",
+        "INSERT INTO user (username, name_user, lastname_user, banking, phone, password_user) VALUES (?, ?, ?, ?, ?, ?)",
         [
-          req.body.username,
-          req.body.name,
-          req.body.lastname,
-          req.body.password,
+        req.body.username,
+        req.body.name,
+        req.body.lastname,
+        "",
+        "",
+        req.body.password,
         ],
         (err, result) => {
           if (err) {
@@ -177,18 +179,16 @@ app.post('/api/save-image', (req, res) => {
   );
 });
 
-
 app.post('/bill/drive', async (req, res) => {
-  const { id_user, worktime, cash, transfer_amount, transfer_amount_user, expenses, note, images } = req.body;
+  const { id_user, worktime, cash, transfer_amount, transfer_amount_user, expenses, note, images, commit_one, commit_two } = req.body;
 
   const today = new Date();
-  console.log(today);
   const todayy = today.toISOString().slice(0, 10);
-  console.log(todayy);
-
-  console.log(req.body);
   try {
-    const { insertId } = await promisify(connection.query).call(connection, "INSERT INTO bill (id_user, worktime, total_cash, total_transfer, total_transfer_user, total_expenses, note, status, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [id_user, worktime, cash, transfer_amount, transfer_amount_user, expenses, note, 0, todayy]);
+    const fullnameQuery = await promisify(connection.query).call(connection, "SELECT CONCAT(`name_user`, ' ', `lastname_user`) AS `fullname` FROM `user` WHERE `id_user` = ?", [id_user]);
+    const fullname = fullnameQuery[0].fullname;
+
+    const { insertId } = await promisify(connection.query).call(connection, "INSERT INTO bill (id_user, name_user, worktime, total_cash, total_transfer, total_transfer_user, total_expenses, note, status, feedback, date, base_commit_one, base_commit_two) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [id_user, fullname, worktime, cash, transfer_amount, transfer_amount_user, expenses, note, 0, "", todayy, commit_one, commit_two]);
 
     const result = await Promise.all(images.map(image => promisify(connection.query).call(connection, "INSERT INTO images (encode_image, id_bill) VALUES (?, ?)", [image, insertId])));
 
@@ -198,6 +198,7 @@ app.post('/bill/drive', async (req, res) => {
     res.status(500).send("Error add bill");
   }
 });
+
 
 app.post('/getimage', async (req, res) => {
   connection.query(`SELECT * FROM images WHERE id_bill = '${req.body.id}'`, (err, result) => {
@@ -214,15 +215,11 @@ app.post('/bill/user', async (req, res) => {
   try {
     const today = new Date(req.body.day);
     const id_user = req.body.id_user;
-    console.log(id_user);
     const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 2);
     const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 8);
 
     const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
     const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
-
-    console.log("Monday of week: " + mondayDate);
-    console.log("Sunday of week: " + sundayDate);
 
     const query = `SELECT * FROM bill WHERE id_user = '${id_user}' AND date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
 
@@ -319,7 +316,7 @@ app.post('/bill/chart/user', async (req, res) => {
       datacalculate[key].push(datacal);
       datacalculate[key].push(dateformat);
     });
-    
+
     res.json(datacalculate);
   } catch (error) {
     res.status(500).send('An error occurred');
@@ -478,9 +475,6 @@ app.post('/admin/bill', async (req, res) => {
   const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
   const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
 
-  console.log("Monday of week: " + mondayDate);
-  console.log("Sunday of week: " + sundayDate);
-
   const query = `SELECT * FROM bill WHERE date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
 
   connection.query(query, function (error, results, fields) {
@@ -495,7 +489,7 @@ app.post('/admin/bill', async (req, res) => {
 
         const uniqueData = Array.from(new Set(mergedData));
 
-        const query3 = `SELECT name_user, lastname_user, banking FROM user WHERE id_user IN (?)`;
+        const query3 = `SELECT id_user, name_user, lastname_user, banking FROM user WHERE id_user IN (?)`;
 
         // ใช้ตัวแปร uniqueData เป็น parameter ในการ query
         connection.query(query3, [uniqueData], (error, resul) => {
@@ -595,4 +589,29 @@ app.post('/admin/bill/update', async (req, res) => {
   }
 });
 
-app.listen(3002, () => console.log('Server started on port 3002'));
+app.get("/admin/commission_setting", (req, res, next) => {
+  connection.query('SELECT * FROM commission_setting ', (err, result) => {
+    if (err) {
+      console.log(err);
+    } else {
+      res.send(result);
+    }
+  });
+  // db.end();
+});
+
+app.post("/admin/commission_setting/update", (req, res, next) => {
+  const { id, commitone, committwo } = req.body;
+  connection.query(`UPDATE commission_setting SET commision_one = ?, commision_two = ? WHERE id_commision  = ?`, [commitone, committwo, id], (err, result) => {
+    try {
+      console.log(req.body, err);
+      console.log(result);
+      res.json({ status: "ok", result });
+    } catch (error) {
+      console.log(err);
+    }
+  });
+  // db.end();
+});
+
+app.listen(3001, () => console.log('Server started on port 3002'));
