@@ -625,8 +625,8 @@ app.post('/admin/chartweek/bill', async (req, res) => {
 
   const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
   const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
-  console.log(mondayDate = " monday");
-  console.log(sundayDate = " sunday");
+  console.log(mondayDate + " monday");
+  console.log(sundayDate + " sunday");
 
   const query = `SELECT * FROM bill WHERE date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
 
@@ -661,10 +661,8 @@ app.post('/admin/chartweek/bill', async (req, res) => {
               }
               data_result[key].push(result_cal.total);
               data_result[key].push(result_cal.name_user);
-            })
-
-            
-            res.send(data_result);
+            }) 
+            res.send({ data: data_result , status: 'success' });
           }
        
       });
