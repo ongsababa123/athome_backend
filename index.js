@@ -8,7 +8,6 @@ const cors = require('cors');
 const secret = "Fullstack-login";
 const util = require('util');
 const { promisify } = require('util');
-
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 // Enable CORS
@@ -475,6 +474,8 @@ app.post('/admin/bill', async (req, res) => {
   const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
   const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
 
+  console.log("monday: " + mondayDate);
+  console.log("sunday: " + sundayDate);
   const query = `SELECT * FROM bill WHERE date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
 
   connection.query(query, function (error, results, fields) {
@@ -614,4 +615,131 @@ app.post("/admin/commission_setting/update", (req, res, next) => {
   // db.end();
 });
 
+app.post('/admin/chartweek/bill', async (req, res) => {
+  const today = new Date(req.body.day);
+  console.log(req.body.day);
+  console.log(today);
+
+  const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 2);
+  const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 8);
+
+  const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
+  const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
+  console.log(mondayDate = " monday");
+  console.log(sundayDate = " sunday");
+
+  const query = `SELECT * FROM bill WHERE date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
+
+  connection.query(query, function (error, results, fields) {
+    // res.send({ data: data, result: resul });
+
+    if (results.length > 0) {
+      const query2 = `SELECT id_user FROM bill WHERE date BETWEEN '${mondayDate}' AND '${sundayDate}'`;
+      connection.query(query2, function (error, result, fields) {
+        const mergedData = result.map((row) => {
+          return row.id_user;
+        });
+    
+          if (error) {
+            console.error(error);
+          } else {
+            if (error) throw error;
+            const data = {};
+            results.forEach((row) => {
+              const { id_user } = row;
+              if (!data[id_user]) {
+                data[id_user] = [];
+              }
+              data[id_user].push(row);
+            });
+            const data_result = {};
+            Object.keys(data).forEach((key) => {
+              console.log(key);
+              const result_cal = from_cal(data[key]);
+              if (!data_result[key]) {
+                data_result[key] = [];
+              }
+              data_result[key].push(result_cal.total);
+              data_result[key].push(result_cal.name_user);
+            })
+
+            
+            res.send(data_result);
+          }
+       
+      });
+
+    } else {
+      results.forEach((row) => {
+        const { id_user } = row;
+        if (!data[id_user]) {
+          data[id_user] = [];
+        }
+        data[id_user].push(row);
+      });
+      res.send({ status: "null" });
+    }
+
+  })
+});
+
+function from_cal(data) {
+  // ส่วนของการประมวลผล
+  const base_commit_one = data[0].base_commit_one;
+  const base_commit_two = data[0].base_commit_two;
+  let total_cash = 0;
+  let transfer_amount = 0;
+  let transfer_amount_user = 0;
+  let expenses = 0;
+  let name_user = data[0].name_user;
+  const worktime1 = data.filter(item => item.worktime === 1).length; /// กรุงเทพ
+  const worktime2 = data.filter(item => item.worktime === 2).length; /// พัทยา
+  const id_bill = data[0].id_bill + ".1";
+  for (let index = 0; index < data.length; index++) {
+      total_cash += data[index].total_cash;
+      transfer_amount += data[index].total_transfer;
+      transfer_amount_user += data[index].total_transfer_user;
+      expenses += data[index].total_expenses;
+  }
+  const total = parseInt(total_cash) + parseInt(transfer_amount);
+  const tip = transfer_amount_user - transfer_amount;
+  let sum_icom = 0;
+  let commision = "";
+  let percencom = 0;
+  if (worktime1 === 0 && worktime2 > 0) { ///ถ้าไม่มีวิ่งในกรุงเทพ ///วิ่งพัทยาล้วน
+      // console.log("พัทยาล้วน");
+      percencom = base_commit_two * data.length;
+  } else if (worktime2 === 0 && worktime1 > 0) { ///ถ้าไม่มีวิ่งในพัทยา ///วิ่งกรุงเทพล้วน
+      // console.log("กรุงเทพล้วน");
+      percencom = base_commit_one * data.length;
+  } else if (worktime1 > 0 && worktime2 > 0) { ///วิ่งผสม 
+      // console.log("วิ่งผสม");
+      percencom = base_commit_one * worktime1 + base_commit_two * worktime2;
+  }
+  if (total >= (percencom * 0.5)) {
+      sum_icom = total * 0.5;
+      commision = " 0.5 หรือ 50%";
+  } else if (total >= (percencom * 0.4)) {
+      sum_icom = total * 0.4;
+      commision = " 0.4 หรือ 40%";
+  } else if (total >= (percencom * 0.3)) {
+      sum_icom = total * 0.3;
+      commision = " 0.3 หรือ 30%";
+  } else if (total >= (percencom * 0.2)) {
+      sum_icom = total * 0.2;
+      commision = " 0.2 หรือ 20%";
+  } else if (total >= (percencom * 0.1)) {
+      sum_icom = total * 0.1;
+      commision = " 0.1 หรือ 10%";
+  } else {
+      sum_icom = 0;
+      commision = "ไม่ได้รับค่าคอมมิชชั่น";
+  }
+
+  const gross_income = sum_icom + tip;
+  const net = total - expenses;
+  const net_cut = net - transfer_amount;
+  // ส่วนของการคืนค่า
+  return { total_cash, transfer_amount, transfer_amount_user, expenses, total, commision, tip, sum_icom, gross_income, net, net_cut, id_bill, base_commit_one, base_commit_two, name_user };
+}
 app.listen(3001, () => console.log('Server started on port 3002'));
