@@ -20,7 +20,7 @@ app.use(bodyParser.json());
 const connection = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  password: '1234',
+  password: '',
   database: 'athome'
 });
 
@@ -214,8 +214,8 @@ app.post('/bill/user', async (req, res) => {
   try {
     const today = new Date(req.body.day);
     const id_user = req.body.id_user;
-    const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 1);
-    const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 7);
+    const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 2);
+    const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 8);
 
     const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
     const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
@@ -468,8 +468,8 @@ app.post('/admin/bill', async (req, res) => {
   console.log(req.body.day);
   console.log(today);
 
-  const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 1);
-  const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 7);
+  const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 2);
+  const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 8);
 
   const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
   const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
@@ -620,8 +620,8 @@ app.post('/admin/chartweek/bill', async (req, res) => {
   console.log(req.body.day);
   console.log(today);
 
-  const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 1);
-  const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 7);
+  const mondayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 2);
+  const sundayOfWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay() + 8);
 
   const mondayDate = mondayOfWeek.toISOString().slice(0, 10);
   const sundayDate = sundayOfWeek.toISOString().slice(0, 10);
@@ -742,4 +742,4 @@ function from_cal(data) {
   // ส่วนของการคืนค่า
   return { total_cash, transfer_amount, transfer_amount_user, expenses, total, commision, tip, sum_icom, gross_income, net, net_cut, id_bill, base_commit_one, base_commit_two, name_user };
 }
-app.listen(3002, () => console.log('Server started on port 3002'));
+app.listen(3001, () => console.log('Server started on port 3002'));
